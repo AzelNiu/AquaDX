@@ -25,8 +25,8 @@ jobs:
       run: |
         mkdir data
         ./gradlew build
-- name: Upload JAR file
-        uses: actions/upload-artifact@v2
+    - name: Upload JAR file
+      uses: actions/upload-artifact@v2
         with:
           name: aqua
           path: target/*.jar
