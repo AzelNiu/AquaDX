@@ -2,12 +2,11 @@ package icu.samnyan.aqua.sega.maimai2.handler
 
 import ext.div
 import ext.isoDateTime
+import ext.logger
 import ext.path
 import icu.samnyan.aqua.sega.general.BaseHandler
 import icu.samnyan.aqua.sega.maimai2.model.request.UploadUserPhoto
 import icu.samnyan.aqua.sega.util.jackson.BasicMapper
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.io.IOException
 import java.nio.file.Files
@@ -19,8 +18,6 @@ import java.util.*
 @Component("Maimai2UploadUserPhotoHandler")
 class UploadUserPhotoHandler(private val mapper: BasicMapper) :
     BaseHandler {
-    val tmpDir = "data/tmp".path().apply { toFile().mkdirs() }
-    val uploadDir = "data/upload/mai2/plays".path().apply { toFile().mkdirs() }
 
     override fun handle(request: Map<String, Any>): String {
         // Maimai DX sends split base64 data for one jpeg image.
@@ -47,6 +44,9 @@ class UploadUserPhotoHandler(private val mapper: BasicMapper) :
     }
 
     companion object {
-        private val logger: Logger = LoggerFactory.getLogger(UploadUserPhotoHandler::class.java)
+        private val logger = logger()
+
+        val tmpDir = "data/tmp".path().apply { toFile().mkdirs() }
+        val uploadDir = "data/upload/mai2/plays".path().apply { toFile().mkdirs() }
     }
 }

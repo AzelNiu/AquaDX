@@ -9,7 +9,7 @@ export interface Card {
   registerTime: string
   accessTime: string
   linked: boolean
-  ghost: boolean
+  isGhost: boolean
 }
 
 export interface AquaNetUser {
@@ -26,6 +26,8 @@ export interface AquaNetUser {
   ghostCard: Card
   cards: Card[]
   computedName: string,
+  password: string,
+  optOutOfLeaderboard: boolean,
 }
 
 export interface CardSummaryGame {
@@ -39,6 +41,7 @@ export interface CardSummary {
   chu3: CardSummaryGame | null
   ongeki: CardSummaryGame | null
   diva: CardSummaryGame | null
+  wacca: CardSummaryGame | null
 }
 
 
@@ -59,6 +62,9 @@ export interface GenericGamePlaylog {
   totalCombo: number
   afterRating: number
   beforeRating: number
+  isFullCombo?: boolean
+  isAllPerfect?: boolean
+  isAllJustice?: boolean
 }
 
 export interface GenericRanking {
@@ -98,6 +104,7 @@ export interface GenericGameSummary {
   lastVersion: string
   ratingComposition: { [key: string]: any }
   recent: GenericGamePlaylog[]
+  rival?: boolean
 }
 
 export interface MusicMeta {
@@ -110,7 +117,9 @@ export interface MusicMeta {
     designer: string
     lv_id: number
     notes: number
-  }[]
+  }[],
+  worldsEndTag?: string
+  worldsEndStars?: number
 }
 
 export type AllMusic = { [key: string]: MusicMeta }
@@ -118,5 +127,38 @@ export type AllMusic = { [key: string]: MusicMeta }
 export interface GameOption {
   key: string
   value: any
-  type: "Boolean"
+  type: 'Boolean' | 'String'
+  game: string
+
+  changed?: boolean
+}
+
+export interface UserItem { itemKind: number, itemId: number, stock: number }
+export interface UserBox {
+  userName: string,
+  nameplateId: number,
+  frameId: number,
+  characterId: number,
+  trophyId: number,
+  mapIconId: number,
+  voiceId: number,
+  avatarWear: number,
+  avatarHead: number,
+  avatarFace: number,
+  avatarSkin: number,
+  avatarItem: number,
+  avatarFront: number,
+  avatarBack: number,
+
+  level: number
+  playerRating: number
+}
+
+export interface ChusanMatchingOption {
+  name: string
+  ui: string
+  guide: string
+  matching: string
+  reflector: string
+  coop: string[]
 }

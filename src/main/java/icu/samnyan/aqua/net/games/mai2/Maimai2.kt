@@ -4,8 +4,11 @@ import ext.*
 import icu.samnyan.aqua.net.db.AquaUserServices
 import icu.samnyan.aqua.net.games.*
 import icu.samnyan.aqua.net.utils.*
+import icu.samnyan.aqua.sega.maimai2.handler.UploadUserPhotoHandler
 import icu.samnyan.aqua.sega.maimai2.model.*
 import icu.samnyan.aqua.sega.maimai2.model.userdata.*
+import org.springframework.http.MediaType
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RestController
 import java.util.*
 
@@ -15,8 +18,9 @@ class Maimai2(
     override val us: AquaUserServices,
     override val playlogRepo: Mai2UserPlaylogRepo,
     override val userDataRepo: Mai2UserDataRepo,
+    override val userMusicRepo: Mai2UserMusicDetailRepo,
     val repos: Mai2Repos,
-): GameApiController<Mai2UserDetail>("mai2", Mai2UserDetail::class) {
+) : GameApiController<Mai2UserDetail>("mai2", Mai2UserDetail::class) {
     override suspend fun trend(@RP username: Str): List<TrendOut> = us.cardByName(username) { card ->
         findTrend(playlogRepo.findByUserCardExtId(card.extId)
             .map { TrendLog(it.playDate, it.afterRating) })
@@ -24,11 +28,21 @@ class Maimai2(
 
     // Only show > S rank
     override val shownRanks = mai2Scores.filter { it.first >= 97 * 10000 }
-    override val settableFields: Map<String, (Mai2UserDetail, String) -> Unit> by lazy { mapOf(
-        "userName" to usernameCheck(SEGA_USERNAME_CAHRS),
-    ) }
+    override val settableFields: Map<String, (Mai2UserDetail, String) -> Unit> by lazy {
+        mapOf(
+            "userName" to usernameCheck(SEGA_USERNAME_CAHRS),
+            "iconId" to { u, v -> u.iconId = v.int() },
+            "plateId" to { u, v -> u.plateId = v.int() },
+            "titleId" to { u, v -> u.titleId = v.int() },
+            "frameId" to { u, v -> u.frameId = v.int() },
+            "partnerId" to { u, v -> u.partnerId = v.int() },
+            "charaSlot" to { u, v -> u.charaSlot = v.split(',').map { it.int() } },
+            "charaLockSlot" to { u, v -> u.charaLockSlot = v.split(',').map { it.int() } },
+        )
+    }
+    override val gettableFields: Set<String> = setOf("lastGameId", "lastRomVersion", "classRank", "playerRating", "courseRank")
 
-    override suspend fun userSummary(@RP username: Str) = us.cardByName(username) { card ->
+    override suspend fun userSummary(@RP username: Str, @RP token: String?) = us.cardByName(username) { card ->
         val extra = repos.userGeneralData.findByUser_Card_ExtId(card.extId)
             .associate { it.propertyKey to it.propertyValue }
 
@@ -37,6 +51,148 @@ class Maimai2(
             "best15" to (extra["recent_rating_new"] ?: "")
         )
 
-        genericUserSummary(card, ratingComposition)
+        // if isLogin than boolean or null
+        // use the type to check user login in frontend
+        val isMyRival = token?.let { t ->
+            us.jwt.auth(t) { u ->
+                if (u.username == username) return@auth null
+                us.cardByName(u.username) { myCard ->
+                    val user = repos.userData.findByCardExtId(card.extId).orElse(null) ?: (404 - "User not found")
+                    val myRival = repos.userGeneralData.findByUser_Card_ExtIdAndPropertyKey(myCard.extId, "favorite_rival")
+                        .map { it.propertyValue.split(',') }.orElse(emptyList()).filter { it.isNotEmpty() }.map { it.long() }
+                    myRival.contains(user.id)
+                }
+            }
+        }
+
+        genericUserSummary(card, ratingComposition, isMyRival)
+    }
+
+    @API("user-rating")
+    suspend fun userRating(@RP username: Str) = us.cardByName(username) { card ->
+        val extra = repos.userGeneralData.findByUser_Card_ExtId(card.extId)
+            .associate { it.propertyKey to it.propertyValue }
+        val b35Str = extra["recent_rating"] ?: (400 - "No rating found")
+        val b15Str = extra["recent_rating_new"] ?: (400 - "No rating found")
+
+        val b35 = b35Str.split(',').filterNot { it.isBlank() }.map { it.split(':') }
+        val b15 = b15Str.split(',').filterNot { it.isBlank() }.map { it.split(':') }
+
+        val musicIdList = listOf(
+            b35.map { it[0].toInt() },
+            b15.map { it[0].toInt() },
+        ).flatten()
+
+        val userMusicList = repos.userMusicDetail.findByUser_Card_ExtIdAndMusicIdIn(card.extId, musicIdList)
+
+        // Dont leak extId
+        mapOf(
+            "best35" to b35,
+            "best15" to b15,
+            "musicList" to userMusicList,
+        )
+    }
+
+    @API("user-name-plate")
+    // legacy
+    suspend fun userNamePlate(@RP username: Str) = this.userDetail(username)
+
+    @API("user-favorite")
+    suspend fun userFavorite(@RP username: Str) = us.cardByName(username) { card ->
+        repos.userFavorite.findByUser_Card_ExtId(card.extId)
+    }
+
+    @PostMapping("change-name")
+    suspend fun changeName(@RP token: String, @RP newName: String) = us.jwt.auth(token) { u ->
+        val newNameFull = toFullWidth(newName)
+        us.cardByName(u.username) { card ->
+            val user = userDataRepo.findByCard(card) ?: (404 - "User not found")
+            user.userName = newNameFull
+            userDataRepo.save(user)
+        }
+        mapOf("newName" to newNameFull)
+    }
+
+    @API("get-login-bonus")
+    suspend fun getLoginBonus(@RP token: String) = us.jwt.auth(token) { u ->
+        us.cardByName(u.username) { card ->
+            repos.userLoginBonus.findByUser_Card_ExtId(card.extId)
+        }
+    }
+
+    @PostMapping("set-current-login-bonus")
+    suspend fun setCurrentLoginBonus(@RP token: String, @RP bonusId: Int) = us.jwt.auth(token) { u ->
+        us.cardByName(u.username) { card ->
+            val loginBonus = repos.userLoginBonus.findByUser_Card_ExtId(card.extId).mut
+            for (bonus in loginBonus) {
+                bonus.isCurrent = bonus.bonusId == bonusId
+            }
+            // if no bonus.bonusId == bonusId in loginBonus
+            if (loginBonus.none { it.bonusId == bonusId }) {
+                // create one
+                val newBonus = Mai2UserLoginBonus().apply {
+                    user = repos.userData.findByCardExtId(card.extId).orElse(null) ?: (404 - "User not found")
+                    this.bonusId = bonusId
+                    isCurrent = true
+                }
+                loginBonus.add(newBonus)
+            }
+            repos.userLoginBonus.saveAll(loginBonus)
+        }
+        SUCCESS
+    }
+
+    @API("owned-items")
+    suspend fun ownedItems(@RP token: String) = us.jwt.auth(token) { u ->
+        us.cardByName(u.username) { card ->
+            repos.userItem.findByUser_Card_ExtId(card.extId)
+        }
+    }
+
+    @PostMapping("set-rival")
+    suspend fun setRival(@RP token: String, @RP rivalUserName: String, @RP isAdd: Boolean) = us.jwt.auth(token) { u ->
+        us.cardByName(u.username) { myCard ->
+            val rivalCard = us.cardByName(rivalUserName) { it }
+            val rivalUser = repos.userData.findByCardExtId(rivalCard.extId).orElse(null) ?: (404 - "User not found")
+            val myRival = repos.userGeneralData.findByUser_Card_ExtIdAndPropertyKey(myCard.extId, "favorite_rival").orElse(null)
+                ?: Mai2UserGeneralData().apply {
+                    user = repos.userData.findByCardExtId(myCard.extId).orElse(null) ?: (404 - "User not found")
+                    propertyKey = "favorite_rival"
+                }
+            val myRivalList = myRival.propertyValue.split(',').filter { it.isNotEmpty() }.mut
+
+            if (isAdd && myRivalList.size >= 4) {
+                (400 - "Rival list is full")
+            } else if (isAdd) {
+                myRivalList.add(rivalUser.id.toString())
+            } else {
+                myRivalList.remove(rivalUser.id.toString())
+            }
+
+            myRival.propertyValue = myRivalList.joinToString(",")
+            repos.userGeneralData.save(myRival)
+        }
+        SUCCESS
+    }
+
+    val photoDir = UploadUserPhotoHandler.uploadDir.toFile().canonicalFile
+
+    @API("my-photo")
+    suspend fun myPhoto(@RP token: Str) = us.jwt.auth(token) { u ->
+        val find = "${u.ghostCard.extId}-"
+        photoDir.listFiles()
+            ?.map { it.name }
+            ?.filter { it.startsWith(find) }
+            ?.sorted()
+            ?: emptyList()
+    }
+
+    @API("my-photo/{fileName}", produces = [MediaType.IMAGE_JPEG_VALUE])
+    suspend fun myPhoto(@RP token: Str, @PV fileName: Str) = us.jwt.auth(token) { u ->
+        val f = (photoDir / fileName)
+        if (!f.canonicalFile.startsWith(photoDir)) (403 - "Never gonna give you up")
+        if (!f.name.startsWith("${u.ghostCard.extId}-")) (403 - "Not your photo")
+        if (!f.exists()) (404 - "Photo not found")
+        f.readBytes()
     }
 }

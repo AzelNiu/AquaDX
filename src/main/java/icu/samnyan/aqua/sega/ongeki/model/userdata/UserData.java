@@ -32,7 +32,7 @@ public class UserData implements Serializable, IUserData {
 
     @JsonSerialize(using = AccessCodeSerializer.class)
     @JsonProperty(value = "accessCode", access = JsonProperty.Access.READ_ONLY)
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "aime_card_id", unique = true)
     private Card card;
     // Access code in card
@@ -150,6 +150,7 @@ public class UserData implements Serializable, IUserData {
 
     private int lastAllNetId;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String lastClientId;
 
     private int lastUsedDeckId;

@@ -9,6 +9,7 @@ import icu.samnyan.aqua.sega.diva.model.common.Edition;
 import icu.samnyan.aqua.sega.diva.model.userdata.*;
 import icu.samnyan.aqua.sega.diva.service.PlayerProfileService;
 import lombok.AllArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import java.util.*;
  */
 @RestController
 @RequestMapping("api/game/diva")
+@ConditionalOnProperty(prefix = "aquaviewer.api", name = "enabled", havingValue = "true")
 @AllArgsConstructor
 public class ApiDivaPlayerDataController {
 
@@ -36,7 +38,7 @@ public class ApiDivaPlayerDataController {
     private final PlayerScreenShotRepository playerScreenShotRepository;
 
     @PostMapping("forceUnlock")
-    public ResponseEntity<MessageResponse> forceUnlock(@RequestParam int pdId) {
+    public ResponseEntity<MessageResponse> forceUnlock(@RequestParam long pdId) {
         PlayerProfile profile = playerProfileService.findByPdId(pdId).orElseThrow();
         Optional<GameSession> session = gameSessionRepository.findByPdId(profile);
         if(session.isPresent()) {
@@ -48,13 +50,13 @@ public class ApiDivaPlayerDataController {
     }
 
     @GetMapping("playerInfo")
-    public Optional<PlayerProfile> getPlayerInfo(@RequestParam int pdId) {
+    public Optional<PlayerProfile> getPlayerInfo(@RequestParam long pdId) {
         return playerProfileService.findByPdId(pdId);
     }
 
     @GetMapping("playerInfo/rival")
-    public Map<String, String> getRivalInfo(@RequestParam int pdId) {
-        int rId = playerProfileService.findByPdId(pdId).orElseThrow().getRivalPdId();
+    public Map<String, String> getRivalInfo(@RequestParam long pdId) {
+        var rId = playerProfileService.findByPdId(pdId).orElseThrow().getRivalPdId();
         Map<String, String> result = new HashMap<>();
         if (rId == -1) {
             result.put("rival", "Not Set");
@@ -167,7 +169,7 @@ public class ApiDivaPlayerDataController {
     }
 
     @GetMapping("playLog")
-    public ReducedPageResponse<PlayLog> getPlayLogs(@RequestParam int pdId,
+    public ReducedPageResponse<PlayLog> getPlayLogs(@RequestParam long pdId,
                                                     @RequestParam(required = false, defaultValue = "0") int page,
                                                     @RequestParam(required = false, defaultValue = "10") int size) {
         Page<PlayLog> playLogs = playLogRepository.findByPdId_PdIdOrderByDateTimeDesc(pdId, PageRequest.of(page, size));
@@ -179,7 +181,7 @@ public class ApiDivaPlayerDataController {
      */
 
     @GetMapping("pvRecord")
-    public ReducedPageResponse<PlayerPvRecord> getPvRecords(@RequestParam int pdId,
+    public ReducedPageResponse<PlayerPvRecord> getPvRecords(@RequestParam long pdId,
                                                             @RequestParam(required = false, defaultValue = "0") int page,
                                                             @RequestParam(required = false, defaultValue = "10") int size) {
         Page<PlayerPvRecord> pvRecords = playerPvRecordRepository.findByPdId_PdIdOrderByPvId(pdId, PageRequest.of(page, size));
@@ -187,7 +189,7 @@ public class ApiDivaPlayerDataController {
     }
 
     @GetMapping("pvRecord/{pvId}")
-    public Map<String, Object> getPvRecord(@RequestParam int pdId, @PathVariable int pvId) {
+    public Map<String, Object> getPvRecord(@RequestParam long pdId, @PathVariable int pvId) {
         Map<String, Object> resultMap = new HashMap<>();
         resultMap.put("records", playerPvRecordRepository.findByPdId_PdIdAndPvId(pdId, pvId));
         playerPvCustomizeRepository.findByPdId_PdIdAndPvId(pdId, pvId).ifPresent(x -> resultMap.put("customize", x));
@@ -251,7 +253,7 @@ public class ApiDivaPlayerDataController {
     }
 
     @GetMapping("module")
-    public ReducedPageResponse<PlayerModule> getModules(@RequestParam int pdId,
+    public ReducedPageResponse<PlayerModule> getModules(@RequestParam long pdId,
                                                         @RequestParam(required = false, defaultValue = "0") int page,
                                                         @RequestParam(required = false, defaultValue = "10") int size) {
         Page<PlayerModule> modules = playerModuleRepository.findByPdId_PdId(pdId, PageRequest.of(page, size));
@@ -259,7 +261,7 @@ public class ApiDivaPlayerDataController {
     }
 
     @GetMapping("customize")
-    public ReducedPageResponse<PlayerCustomize> getCustomizes(@RequestParam int pdId,
+    public ReducedPageResponse<PlayerCustomize> getCustomizes(@RequestParam long pdId,
                                                               @RequestParam(required = false, defaultValue = "0") int page,
                                                               @RequestParam(required = false, defaultValue = "10") int size) {
         Page<PlayerCustomize> customizes = playerCustomizeRepository.findByPdId_PdId(pdId, PageRequest.of(page, size));
@@ -267,7 +269,7 @@ public class ApiDivaPlayerDataController {
     }
 
     @GetMapping("screenshot")
-    public List<PlayerScreenShot> getScreenshotList(@RequestParam int pdId) {
+    public List<PlayerScreenShot> getScreenshotList(@RequestParam long pdId) {
         return playerScreenShotRepository.findByPdId_PdId(pdId);
     }
 

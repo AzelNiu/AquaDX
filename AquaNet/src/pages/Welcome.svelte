@@ -21,6 +21,10 @@
   let error = ""
   let verifyMsg = ""
 
+  if (USER.isLoggedIn()) {
+    window.location.href = "/home"
+  }
+
   if (params.get('confirm-email')) {
     state = 'verify'
     verifyMsg = t("welcome.verifying")
@@ -62,19 +66,21 @@
 
       // Send request to server
       await USER.register({ username, email, password, turnstile })
+        .then(() => {
+          // Show verify email message
+          state = 'verify'
+          verifyMsg = t("welcome.verification-sent", { email })
+        })
         .catch(e => {
           error = e.message
           submitting = false
           turnstileReset()
         })
-
-      // Show verify email message
-      state = 'verify'
-      verifyMsg = t("welcome.verification-sent", { email })
     }
     else {
       // Send request to server
-      await USER.login({ email, password, turnstile }).then(() => window.location.href = "/home")
+      await USER.login({ email, password, turnstile })
+        .then(() => window.location.href = "/home")
         .catch(e => {
           if (e.message === 'Email not verified - STATE_0') {
             state = 'verify'
@@ -155,7 +161,7 @@
 </main>
 
 <style lang="sass">
-  @import "../vars"
+  @use "../vars"
 
   .login-form
     display: flex
@@ -169,7 +175,7 @@
       align-items: center
 
   #home
-    color: $c-main
+    color: vars.$c-main
     position: relative
     width: 100%
     height: 100%
@@ -183,7 +189,7 @@
     flex-direction: column
     justify-content: center
 
-    margin-top: -$nav-height
+    margin-top: -(vars.$nav-height)
 
     // Content container
     > div
@@ -194,10 +200,10 @@
 
       // Switching state container
       > div
-        transition: $transition
+        transition: vars.$transition
 
     #title
-      font-family: Quicksand, $font
+      font-family: Quicksand, vars.$font
       user-select: none
 
       // Gap between text characters

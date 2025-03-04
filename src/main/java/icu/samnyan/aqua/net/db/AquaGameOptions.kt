@@ -14,23 +14,41 @@ class AquaGameOptions(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long = 0,
 
-    @SettingField
+    @SettingField("general")
     var unlockMusic: Boolean = false,
 
-    @SettingField
+    @SettingField("general")
     var unlockChara: Boolean = false,
 
-    @SettingField
+    @SettingField("general")
     var unlockCollectables: Boolean = false,
 
-    @SettingField
+    @SettingField("general")
     var unlockTickets: Boolean = false,
 
-    @SettingField
+    @SettingField("wacca")
     var waccaInfiniteWp: Boolean = false,
 
-    @SettingField
+    @SettingField("wacca")
     var waccaAlwaysVip: Boolean = false,
+
+    @SettingField("chu3")
+    var chusanTeamName: String = "",
+
+    @SettingField("chu3")
+    var chusanInfinitePenguins: Boolean = false,
+
+    @SettingField("chu3-matching")
+    var chusanMatchingServer: String = "",
+
+    @SettingField("chu3-matching")
+    var chusanMatchingReflector: String = "",
+
+    @SettingField("mai2")
+    var enableMusicRank: Boolean = true,
+
+    @SettingField("ongeki")
+    var ongekiInfiniteKaika: Boolean = false,
 )
 
 interface AquaGameOptionsRepo : JpaRepository<AquaGameOptions, Long>

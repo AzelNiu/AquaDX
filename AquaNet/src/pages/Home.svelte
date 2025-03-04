@@ -8,6 +8,8 @@
   import StatusOverlays from "../components/StatusOverlays.svelte";
   import ActionCard from "../components/ActionCard.svelte";
   import { t } from "../libs/i18n";
+  import ImportDataAction from "./Home/ImportDataAction.svelte";
+  import Communities from "./Home/Communities.svelte";
 
   USER.ensureLoggedIn();
 
@@ -45,15 +47,17 @@
         {/if}
       </ActionCard>
 
-      <ActionCard color="82, 93, 233" icon="ic:baseline-discord" on:click={() => window.location.href = DISCORD_INVITE}>
-        <h3>{t('home.join-discord')}</h3>
-        <span>{t('home.join-discord-description')}</span>
+      <ActionCard color="82, 93, 233" icon="fluent:chat-12-filled" on:click={() => tab = 3}>
+        <h3>{t('home.join-community')}</h3>
+        <span>{t('home.join-community-description')}</span>
       </ActionCard>
 
       <ActionCard on:click={() => tab = 2} icon="uil:link-alt">
         <h3>{t('home.setup')}</h3>
         <span>{t('home.setup-description')}</span>
       </ActionCard>
+
+      <ImportDataAction/>
     </div>
   {:else if tab === 1}
     <div out:fade={FADE_OUT} in:fade={FADE_IN}>
@@ -63,13 +67,17 @@
     <div out:fade={FADE_OUT} in:fade={FADE_IN}>
       <SetupInstructions/>
     </div>
+  {:else if tab === 3}
+    <div out:fade={FADE_OUT} in:fade={FADE_IN}>
+      <Communities/>
+    </div>
   {/if}
 </main>
 
 <StatusOverlays {error} loading={!me}/>
 
 <style lang="sass">
-  @import "../vars"
+  @use "../vars"
 
   .tabs
     display: flex
@@ -77,7 +85,7 @@
 
     div
       &.active
-        color: $c-main
+        color: vars.$c-main
 
   h3
     font-size: 1.3rem

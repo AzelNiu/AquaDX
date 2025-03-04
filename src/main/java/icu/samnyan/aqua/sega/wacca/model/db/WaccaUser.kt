@@ -16,7 +16,7 @@ import java.util.*
  */
 @Entity @Table(name = "wacca_user")
 class WaccaUser : BaseEntity(), IUserData {
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "aime_card_id", unique = true)
     override var card: Card? = Card()
 
@@ -44,6 +44,8 @@ class WaccaUser : BaseEntity(), IUserData {
     var playCounts: MutableList<Int> = mutableListOf(0, 0, 0, 0, 0)
     @Convert(converter = IntegerListConverter::class)
     var friendViews: MutableList<Int> = mutableListOf(0, 0, 0)
+    @Column(length = 50)
+    override var lastClientId = ""
     @Column(length = 50)
     override var lastRomVersion = "1.0.0"
     @Convert(converter = IntegerListConverter::class)

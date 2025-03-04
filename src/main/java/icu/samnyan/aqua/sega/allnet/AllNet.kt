@@ -6,8 +6,6 @@ import icu.samnyan.aqua.sega.util.AllNetBillingDecoder.decodeAllNet
 import icu.samnyan.aqua.sega.util.AquaConst
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.bind.annotation.PostMapping
@@ -23,8 +21,10 @@ import java.util.*
 class AllNetProps {
     var host: String = ""
     var port: Int? = null
+    var hidePort: Boolean = true
     val keychipSesExpire: Long = 172800000 // milliseconds
     var checkKeychip: Boolean = false
+    var keychipPermissiveForTesting: Boolean = false
     var redirect: String = "web"
 
     var placeName: String = ""
@@ -102,8 +102,10 @@ class AllNet(
         // game_id SDEZ, ver 1.35, serial A0000001234, ip, firm_ver 50000, boot_ver 0000,
         // encode UTF-8, format_ver 3, hops 1， token 2010451813
         val reqMap = decodeAllNet(dataStream.readAllBytes())
-        var serial = reqMap["serial"] ?: ""
+        val serial = reqMap["serial"] ?: ""
         logger.info("AllNet /PowerOn : $reqMap")
+
+        var session: String? = null
 
         // Proper keychip authentication
         if (props.checkKeychip) {
@@ -112,11 +114,20 @@ class AllNet(
             if (u != null) {
                 // Create a new session for the user
                 logger.info("> Keychip authenticated: ${u.auId} ${u.computedName}")
-                serial = keychipSessionService.new(u).token
+                session = keychipSessionService.new(u, reqMap["game_id"] ?: "").token
             }
 
             // Check if it's a whitelisted keychip
-            else if (serial.isEmpty() || !keychipRepo.existsByKeychipId(serial)) {
+            else if (!serial.isEmpty() && keychipRepo.existsByKeychipId(serial)) {
+                session = keychipSessionService.new(null, reqMap["game_id"] ?: "").token
+            }
+
+            else if (props.keychipPermissiveForTesting) {
+                logger.warn("> Accepted invalid keychip $serial in permissive mode")
+                session = keychipSessionService.new(null, reqMap["game_id"] ?: "").token
+            }
+
+            else {
                 // This will cause an allnet auth bad on client side
                 return "".also { logger.warn("> Rejected: Keychip not found") }
             }
@@ -126,8 +137,8 @@ class AllNet(
         val ver = reqMap["ver"] ?: "1.0"
 
         val formatVer = reqMap["format_ver"] ?: ""
-        val resp = props.map.toMutableMap() + mapOf(
-            "uri" to switchUri(localAddr, localPort, gameId, ver, serial),
+        val resp = props.map.mut + mapOf(
+            "uri" to switchUri(localAddr, localPort, gameId, ver, session),
             "host" to props.host.ifBlank { localAddr },
         )
 
@@ -160,20 +171,22 @@ class AllNet(
         return resp.toUrl() + "\n"
     }
 
-    private fun switchUri(localAddr: Str, localPort: Str, gameId: Str, ver: Str, serial: Str): Str {
-        val addr = props.host.ifBlank { localAddr }
-        val port = props.port?.toString() ?: localPort
+    private fun switchUri(localAddr: Str, localPort: Str, gameId: Str, ver: Str, session: Str?): Str {
+        val addr = props.host.ifBlank { localAddr } +
+            if (props.hidePort) "" else ":${props.port ?: localPort}"
 
         // If keychip authentication is enabled, the game URLs will be set to /gs/{token}/{game}/...
-        val base = if (props.checkKeychip) "gs/$serial" else "g"
+        val base = if (session != null) "gs/$session" else "g"
 
-        return "http://$addr:$port/$base/" + when (gameId) {
-            "SDBT" -> "chu2/$ver/$serial/"
+        return "http://$addr/$base/" + when (gameId) {
+            "SDBT" -> "chu2/$ver/$session/"
             "SDHD" -> "chu3/$ver/"
-            "SDGS" -> "chu3/$ver/"
+            "SDGS" -> "chu3/$ver/" // International (c3exp)
             "SBZV" -> "diva/"
             "SDDT" -> "ongeki/"
             "SDEY" -> "mai/"
+            "SDGA" -> "mai2/" // International (Exp)
+            "SDGB" -> "mai2/" // International (China) - TODO: Test it
             "SDEZ" -> "mai2/"
             "SDFE" -> "wacca" // Note: Wacca must not end with a trailing slash
             "SDED" -> "card/"
@@ -182,7 +195,7 @@ class AllNet(
     }
 
     companion object {
-        val logger: Logger = LoggerFactory.getLogger(AllNet::class.java)
+        val logger = logger()
     }
 }
 

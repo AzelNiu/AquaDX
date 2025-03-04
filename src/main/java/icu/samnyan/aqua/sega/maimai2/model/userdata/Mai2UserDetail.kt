@@ -16,7 +16,7 @@ import jakarta.persistence.*
 class Mai2UserDetail(
     @get:JsonSerialize(using = AccessCodeSerializer::class)
     @get:JsonProperty(value = "accessCode", access = JsonProperty.Access.READ_ONLY)
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "aime_card_id", unique = true)
     override var card: Card? = null,
 
@@ -70,7 +70,9 @@ class Mai2UserDetail(
     var lastAllNetId: Int = 0,
     var lastRegionId: Int = 0,
     var lastRegionName: String = "",
-    var lastClientId: String = "",
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    override var lastClientId: String = "",
     var lastCountryCode: String = "",
     var lastSelectEMoney: Int = 0,
     var lastSelectTicket: Int = 0,
@@ -145,6 +147,10 @@ class Mai2UserDetail(
     @Transient
     var cmLastEmoneyCredit: Int = 69,
     var mapStock: Int = 0,
+
+    // MaiMile
+    var point: Int = 0,
+    var totalPoint: Int = 0,
 
     // TODO: Make these non-nullable with default value
     var currentPlayCount: Int? = 0,

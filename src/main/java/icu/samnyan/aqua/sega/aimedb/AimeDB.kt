@@ -1,7 +1,9 @@
 package icu.samnyan.aqua.sega.aimedb
 
+import ext.logger
 import ext.toHex
 import icu.samnyan.aqua.net.db.AquaUserServices
+import icu.samnyan.aqua.sega.allnet.AllNetProps
 import icu.samnyan.aqua.sega.general.model.Card
 import icu.samnyan.aqua.sega.general.service.CardService
 import io.netty.buffer.ByteBuf
@@ -25,8 +27,9 @@ import kotlin.jvm.optionals.getOrNull
 class AimeDB(
     val cardService: CardService,
     val us: AquaUserServices,
+    val allNetProps: AllNetProps,
 ): ChannelInboundHandlerAdapter() {
-    val logger: Logger = LoggerFactory.getLogger(AimeDB::class.java)
+    val logger = logger()
 
     data class AimeBaseInfo(val gameId: String, val keychipId: String)
 
@@ -65,7 +68,15 @@ class AimeDB(
             logger.info("AimeDB /${handler.name} : (game ${base.gameId}, keychip ${base.keychipId})")
 
             // Check keychip
-            if (!us.validKeychip(base.keychipId)) return logger.warn("> Rejected: Keychip not found")
+            // We do not check for type 0x13 because of a bug in duolinguo.dll
+            if (!us.validKeychip(base.keychipId) && type != 0x13) {
+                if (allNetProps.keychipPermissiveForTesting) {
+                    logger.warn("> Accepted invalid keychip ${base.keychipId} in permissive mode")
+                } else {
+                    logger.warn("> Rejected: Keychip not found")
+                    return
+                }
+            }
 
             handler.fn(data)?.let { ctx.write(it) }
         } finally {
@@ -104,9 +115,11 @@ class AimeDB(
         }
     }
 
-    fun getCard(accessCode: String) = cardService.getCardByAccessCode(accessCode).getOrNull()?.let {
+    fun getCard(accessCode: String) = cardService.getCardByAccessCode(accessCode).getOrNull()?.let { card ->
         // Update card access time
-        cardService.cardRepo.save(it.apply { accessTime = LocalDateTime.now() }).extId
+        cardService.cardRepo.save(card.apply { accessTime = LocalDateTime.now() }).let {
+            it.aquaUser?.ghostCard ?: it
+        }?.extId
     } ?: -1
 
     /**
@@ -114,8 +127,8 @@ class AimeDB(
      */
     fun doFelicaLookupV2(msg: ByteBuf): ByteBuf {
         val idm = msg.slice(0x30, 0x38 - 0x30).getLong(0)
-        val pmm = msg.slice(0x38, 0x40 - 0x38).getLong(0)
-        logger.info("> Felica Lookup v2 (idm $idm, pmm $pmm)")
+        val dfc = msg.slice(0x38, 0x40 - 0x38).getLong(0)
+        logger.info("> Felica Lookup v2 (idm $idm, dfc $dfc)")
 
         // Get the decimal represent of the hex value, same from minime
         val accessCode = idm.toString().replace("-", "").padStart(20, '0')
